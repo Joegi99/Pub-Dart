@@ -5,7 +5,7 @@ const TOUR = {
   players: ["Jögi","Emil","Filip","Jonssons","Åhman","Håkanssons","Henkan","Graham","Martin K"],
 
   // Photos for the slider: put files in /photos and list them here, e.g. "photos/gw1.jpg"
-  photos: [photos/gw1a.jpg,],
+  photos: [],
 
   gameweeks: [
     { date: "16 Okt",
