@@ -42,10 +42,11 @@ tr.lead td:nth-child(2){font-weight:700}
 .empty{color:var(--mute);padding:18px;border:1px dashed var(--line);border-radius:6px}
 .h2h td.diag{background:#0f2a20}
 .win{color:#8fd49b}.loss{color:#f08a7c}
-.slider{position:relative;overflow:hidden;border-radius:6px;aspect-ratio:16/7;background:var(--panel);border:1px solid var(--line);margin-top:8px}
+.slider{position:relative;overflow:hidden;border-radius:6px;height:clamp(340px,75vh,680px);background:var(--panel);border:1px solid var(--line);margin-top:8px}
 .track{display:flex;height:100%;transition:transform .8s ease}
 .slide{flex:0 0 100%;height:100%;position:relative}
-.slide img{width:100%;height:100%;object-fit:cover;display:block}
+.slide::before{content:'';position:absolute;inset:-30px;background:var(--bg) center/cover;filter:blur(28px) brightness(.45)}
+.slide img{position:relative;width:100%;height:100%;object-fit:contain;display:block}
 .slide.ph{display:grid;place-items:center;color:var(--mute);text-align:center;padding:20px}
 .dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:8px}
 .dots button{width:10px;height:10px;border-radius:50%;border:0;background:rgba(241,233,210,.4);padding:0;cursor:pointer}
@@ -200,7 +201,7 @@ function playoffs() {
 
 function sliderHTML() {
   const slides = TOUR.photos.length
-    ? TOUR.photos.map(src => `<div class="slide"><img src="${esc(src)}" alt="PubDart photo" loading="lazy"></div>`).join('')
+    ? TOUR.photos.map(src => `<div class="slide" style="--bg:url('${esc(src)}')"><img src="${esc(src)}" alt="PubDart photo" loading="lazy"></div>`).join('')
     : `<div class="slide ph">Photos from the pub show up here.<br>Add files to /photos and list them in data.js.</div>`;
   const n = TOUR.photos.length || 1;
   return `<h2>Photos</h2><div class="slider" id="slider"><div class="track">${slides}</div>
