@@ -2,7 +2,7 @@
 // Names in `scores` and `matches` must match names in `players` exactly.
 const TOUR = {
   name: "PubDart 26/27",
-  players: ["Player 1","Player 2","Player 3","Player 4","Player 5","Player 6","Player 7","Player 8","Player 9"],
+  players: ["Filip","Emil","Jögi","Håkanssons","Henkan","Jonssons","Åhman","Graham","Robban"],
 
   // Photos for the slider: put files in /photos and list them here, e.g. "photos/gw1.jpg"
   photos: [],
