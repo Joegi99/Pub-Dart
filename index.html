@@ -52,6 +52,17 @@ tr.lead td:nth-child(2){font-weight:700}
 .dots button[aria-current=true]{background:var(--red)}
 .tbd{text-align:center;padding:60px 20px;border:1px dashed var(--line);border-radius:6px}
 .tbd p{color:var(--mute);max-width:46ch;margin:8px auto 0}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start}
+.gcard h3{font:700 1.05rem "DM Sans";margin:0 0 8px;color:var(--brass)}
+.gm{display:grid;gap:6px;margin-top:10px}
+.gm .match{padding:7px 12px;font-size:.92rem}
+.tag{display:inline-block;background:var(--red);color:var(--text);font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
+.final{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;text-align:center;padding:28px 16px 18px;border:2px solid var(--brass);border-radius:10px;background:var(--panel)}
+.fp{font:400 clamp(1.1rem,3.5vw,1.8rem) "Alfa Slab One",Georgia,serif;color:var(--mute)}
+.fp.w{color:var(--text)}
+.fs{font:400 clamp(1.6rem,6vw,3rem) "Alfa Slab One",Georgia,serif;color:var(--brass)}
+.bonus{grid-column:1/-1;color:var(--brass);font-weight:700}
+@media (max-width:420px){.groups{grid-template-columns:1fr}}
 footer{color:var(--mute);font-size:.85rem;padding:40px 0}
 @media (prefers-reduced-motion:reduce){.track{transition:none}}
 </style>
@@ -70,8 +81,37 @@ footer{color:var(--mute);font-size:.85rem;padding:40px 0}
 const $ = (s, el=document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P = TOUR.players, GW = TOUR.gameweeks;
-const pts = (g, p) => Number(g.scores[p]) || 0;
-const played = g => Object.keys(g.scores).length > 0;
+const CFG = Object.assign({win:1, draw:0, finalBonus:1}, TOUR.points);
+const done = m => m.sa != null && m.sb != null && m.sa !== '' && m.sb !== '';
+function computeGW(g) {
+  const manual = g.scores && Object.keys(g.scores).length ? g.scores : null;
+  const groups = (g.groups || []).map(gr => {
+    const t = {};
+    const row = n => t[n] = t[n] || {name:n,p:0,w:0,d:0,l:0,lf:0,la:0,pts:0};
+    (gr.matches || []).forEach(m => { row(m.a); row(m.b); if (!done(m)) return;
+      const A = row(m.a), B = row(m.b); A.p++; B.p++; A.lf += m.sa; A.la += m.sb; B.lf += m.sb; B.la += m.sa;
+      if (m.sa > m.sb) { A.w++; B.l++; } else if (m.sb > m.sa) { B.w++; A.l++; } else { A.d++; B.d++; } });
+    const rows = Object.values(t).map(r => (r.pts = r.w*CFG.win + r.d*CFG.draw, r))
+      .sort((a,b) => b.pts-a.pts || (b.lf-b.la)-(a.lf-a.la) || b.lf-a.lf || a.name.localeCompare(b.name));
+    const ms = gr.matches || [];
+    return {name: gr.name, matches: ms, rows, started: ms.some(done), done: ms.length > 0 && ms.every(done)};
+  });
+  const win = groups.map(x => x.done ? x.rows[0].name : null);
+  const f = g.final || {};
+  const a = f.a || win[0], b = f.b || win[1];
+  const final = a && b ? {a, b, sa: f.sa, sb: f.sb, played: done(f)} : null;
+  const points = {};
+  if (manual) Object.assign(points, manual);
+  else {
+    groups.forEach(x => x.rows.forEach(r => points[r.name] = (points[r.name]||0) + r.pts));
+    if (final && final.played && final.sa !== final.sb) { const w = final.sa > final.sb ? final.a : final.b; points[w] = (points[w]||0) + CFG.finalBonus; }
+  }
+  return {groups, final, points, manual: !!manual};
+}
+const calc = g => g._c || (g._c = computeGW(g));
+const allMatches = g => [...(g.matches||[]), ...calc(g).groups.flatMap(x => x.matches), ...(calc(g).final && calc(g).final.played ? [calc(g).final] : [])];
+const pts = (g, p) => Number(calc(g).points[p]) || 0;
+const played = g => Object.keys(calc(g).points).length > 0;
 
 function cumulative(upto) {
   const t = {}; P.forEach(p => t[p] = 0);
@@ -95,25 +135,35 @@ function standings() {
 }
 
 function gameweek(i) {
-  const g = GW[i];
-  if (!played(g) && !g.matches.length)
+  const g = GW[i], c = calc(g);
+  if (!played(g) && !c.groups.some(x => x.started) && !c.final)
     return `<h2>Gameweek ${i+1}</h2><div class="empty">No scores yet. Date: ${esc(g.date||'TBD')}</div>`;
-  const gwOrder = [...P].sort((a,b) => pts(g,b)-pts(g,a) || P.indexOf(a)-P.indexOf(b));
-  const after = cumulative(i+1);
-  const rows = gwOrder.map((p,k) => `<tr><td class="rank">${k+1}</td><td>${esc(p)}</td><td>${pts(g,p)}</td><td class="total">${after[p]}</td></tr>`);
-  const ms = g.matches.map(m => {
-    const aw = m.sa > m.sb, bw = m.sb > m.sa;
-    return `<div class="match"><span class="${aw?'w':''}">${esc(m.a)}</span><b>${m.sa} – ${m.sb}</b><span class="${bw?'w':''}">${esc(m.b)}</span></div>`;
+  const matchHTML = m => done(m)
+    ? `<div class="match"><span class="${m.sa>m.sb?'w':''}">${esc(m.a)}</span><b>${m.sa} – ${m.sb}</b><span class="${m.sb>m.sa?'w':''}">${esc(m.b)}</span></div>`
+    : `<div class="match"><span>${esc(m.a)}</span><span class="dim">vs</span><span>${esc(m.b)}</span></div>`;
+  const groupsHTML = c.groups.map(gr => {
+    const rows = gr.rows.map((r,k) => { const top = k===0 && gr.started;
+      return `<tr class="${top?'lead':''}"><td class="rank">${k+1}</td><td>${esc(r.name)}${top?` <span class="tag">${gr.done?'Winner':'Leading'}</span>`:''}</td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.lf}–${r.la}</td><td class="total">${r.pts}</td></tr>`; });
+    return `<section class="gcard"><h3>${esc(gr.name||'Group')}</h3>${table(['#','Player','P','W','D','L','Legs','Pts'], rows)}
+      <div class="gm">${gr.matches.map(matchHTML).join('')}</div></section>`;
   }).join('');
+  let finalHTML = '';
+  if (c.final) { const f = c.final;
+    finalHTML = `<h2>Final</h2><div class="final"><div class="fp ${f.played&&f.sa>f.sb?'w':''}">${esc(f.a)}</div>
+      <div class="fs">${f.played ? `${f.sa} – ${f.sb}` : 'vs'}</div><div class="fp ${f.played&&f.sb>f.sa?'w':''}">${esc(f.b)}</div>
+      <div class="bonus">${f.played && f.sa!==f.sb ? `+${CFG.finalBonus} point to ${esc(f.sa>f.sb?f.a:f.b)}` : `Winner gets +${CFG.finalBonus} point`}</div></div>`; }
+  const order = [...P].sort((a,b) => pts(g,b)-pts(g,a) || P.indexOf(a)-P.indexOf(b));
+  const after = cumulative(i+1);
+  const rows = order.map((p,k) => `<tr><td class="rank">${k+1}</td><td>${esc(p)}</td><td>${pts(g,p)}</td><td class="total">${after[p]}</td></tr>`);
   return `<h2>Gameweek ${i+1}</h2><p class="sub" style="margin:-6px 0 14px">${esc(g.date||'')}</p>
-    ${table(['#','Player','GW points','Total after GW'], rows)}
-    <h2>Matches</h2>${ms ? `<div class="matches">${ms}</div>` : '<div class="empty">No matchups entered.</div>'}`;
+    ${groupsHTML ? `<div class="groups">${groupsHTML}</div>` : ''}${finalHTML}
+    <h2>Gameweek points</h2>${table(['#','Player','GW points','Total after GW'], rows)}`;
 }
 
 function h2h() {
   const rec = {}; P.forEach(a => { rec[a] = {}; P.forEach(b => rec[a][b] = [0,0,0]); });
-  GW.forEach(g => g.matches.forEach(m => {
-    if (!rec[m.a] || !rec[m.b]) return;
+  GW.forEach(g => allMatches(g).forEach(m => {
+    if (!rec[m.a] || !rec[m.b] || !done(m)) return;
     const r = m.sa > m.sb ? [0,1] : m.sa < m.sb ? [1,0] : null;
     if (!r) { rec[m.a][m.b][2]++; rec[m.b][m.a][2]++; return; }
     rec[m.a][m.b][r[0]===0?0:1]++; rec[m.b][m.a][r[0]===0?1:0]++;
