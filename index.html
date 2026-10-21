@@ -81,19 +81,32 @@ footer{color:var(--mute);font-size:.85rem;padding:40px 0}
 const $ = (s, el=document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P = TOUR.players, GW = TOUR.gameweeks;
-const CFG = Object.assign({win:1, draw:0, finalBonus:1}, TOUR.points);
+const CFG = Object.assign({finalBonus:1, finalLegs:false}, TOUR.points); // points = legs won; final winner gets finalBonus
 const done = m => m.sa != null && m.sb != null && m.sa !== '' && m.sb !== '';
 function computeGW(g) {
   const manual = g.scores && Object.keys(g.scores).length ? g.scores : null;
   const groups = (g.groups || []).map(gr => {
     const t = {};
-    const row = n => t[n] = t[n] || {name:n,p:0,w:0,d:0,l:0,lf:0,la:0,pts:0};
+    const row = n => t[n] = t[n] || {name:n,p:0,w:0,l:0,lf:0,la:0,pts:0};
     (gr.matches || []).forEach(m => { row(m.a); row(m.b); if (!done(m)) return;
       const A = row(m.a), B = row(m.b); A.p++; B.p++; A.lf += m.sa; A.la += m.sb; B.lf += m.sb; B.la += m.sa;
-      if (m.sa > m.sb) { A.w++; B.l++; } else if (m.sb > m.sa) { B.w++; A.l++; } else { A.d++; B.d++; } });
-    const rows = Object.values(t).map(r => (r.pts = r.w*CFG.win + r.d*CFG.draw, r))
-      .sort((a,b) => b.pts-a.pts || (b.lf-b.la)-(a.lf-a.la) || b.lf-a.lf || a.name.localeCompare(b.name));
+      if (m.sa > m.sb) { A.w++; B.l++; } else if (m.sb > m.sa) { B.w++; A.l++; } });
     const ms = gr.matches || [];
+    const list = Object.values(t).map(r => (r.pts = r.lf, r));
+    const cmpBase = (a,b) => (b.lf-b.la)-(a.lf-a.la) || a.name.localeCompare(b.name);
+    list.sort((a,b) => b.pts-a.pts || cmpBase(a,b));
+    // tiebreak: same points -> head-to-head wins between the tied players that week
+    const rows = [];
+    for (let k = 0; k < list.length;) {
+      let e = k; while (e < list.length && list[e].pts === list[k].pts) e++;
+      const tied = list.slice(k, e);
+      if (tied.length > 1) {
+        const names = tied.map(r => r.name), hw = {}; names.forEach(n => hw[n] = 0);
+        ms.forEach(m => { if (done(m) && names.includes(m.a) && names.includes(m.b) && m.sa !== m.sb) hw[m.sa > m.sb ? m.a : m.b]++; });
+        tied.sort((a,b) => hw[b.name]-hw[a.name] || cmpBase(a,b));
+      }
+      rows.push(...tied); k = e;
+    }
     return {name: gr.name, matches: ms, rows, started: ms.some(done), done: ms.length > 0 && ms.every(done)};
   });
   const win = groups.map(x => x.done ? x.rows[0].name : null);
@@ -104,6 +117,7 @@ function computeGW(g) {
   if (manual) Object.assign(points, manual);
   else {
     groups.forEach(x => x.rows.forEach(r => points[r.name] = (points[r.name]||0) + r.pts));
+    if (final && final.played && CFG.finalLegs) { points[final.a] = (points[final.a]||0) + final.sa; points[final.b] = (points[final.b]||0) + final.sb; }
     if (final && final.played && final.sa !== final.sb) { const w = final.sa > final.sb ? final.a : final.b; points[w] = (points[w]||0) + CFG.finalBonus; }
   }
   return {groups, final, points, manual: !!manual};
@@ -143,8 +157,8 @@ function gameweek(i) {
     : `<div class="match"><span>${esc(m.a)}</span><span class="dim">vs</span><span>${esc(m.b)}</span></div>`;
   const groupsHTML = c.groups.map(gr => {
     const rows = gr.rows.map((r,k) => { const top = k===0 && gr.started;
-      return `<tr class="${top?'lead':''}"><td class="rank">${k+1}</td><td>${esc(r.name)}${top?` <span class="tag">${gr.done?'Winner':'Leading'}</span>`:''}</td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.lf}–${r.la}</td><td class="total">${r.pts}</td></tr>`; });
-    return `<section class="gcard"><h3>${esc(gr.name||'Group')}</h3>${table(['#','Player','P','W','D','L','Legs','Pts'], rows)}
+      return `<tr class="${top?'lead':''}"><td class="rank">${k+1}</td><td>${esc(r.name)}${top?` <span class="tag">${gr.done?'Winner':'Leading'}</span>`:''}</td><td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.lf}–${r.la}</td><td class="total">${r.pts}</td></tr>`; });
+    return `<section class="gcard"><h3>${esc(gr.name||'Group')}</h3>${table(['#','Player','P','W','L','Legs','Pts'], rows)}
       <div class="gm">${gr.matches.map(matchHTML).join('')}</div></section>`;
   }).join('');
   let finalHTML = '';
@@ -175,7 +189,7 @@ function h2h() {
     if (!w && !l && !d) return '<td class="dim">·</td>';
     return `<td><span class="win">${w}</span>–<span class="loss">${l}</span>${d?` <span class="dim">(${d})</span>`:''}</td>`;
   }).join('') + '</tr>');
-  return `<h2>Head to head</h2><p class="sub" style="margin:-6px 0 14px">Row player's wins–losses against the column player. Draws in brackets.</p>
+  return `<h2>Head to head</h2><p class="sub" style="margin:-6px 0 14px">Row player's wins–losses against the column player.</p>
     <div class="h2h">${table(['','Player', ...P.map(p=>esc(p))], rows)}</div>`;
 }
 
