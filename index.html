@@ -64,6 +64,8 @@ tr.lead td:nth-child(2){font-weight:700}
 .fs{font:400 clamp(1.6rem,6vw,3rem) "Alfa Slab One",Georgia,serif;color:var(--brass)}
 .bonus{grid-column:1/-1;color:var(--brass);font-weight:700}
 @media (max-width:420px){.groups{grid-template-columns:1fr}}
+.pick{color:var(--mute);display:block;margin-bottom:12px}
+.pick select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:500 1rem "DM Sans";margin-left:6px}
 footer{color:var(--mute);font-size:.85rem;padding:40px 0}
 @media (prefers-reduced-motion:reduce){.track{transition:none}}
 </style>
@@ -126,7 +128,7 @@ function computeGW(g) {
 const calc = g => g._c || (g._c = computeGW(g));
 const allMatches = g => [...(g.matches||[]), ...calc(g).groups.flatMap(x => x.matches), ...(calc(g).final && calc(g).final.played ? [calc(g).final] : [])];
 const pts = (g, p) => Number(calc(g).points[p]) || 0;
-const played = g => Object.keys(calc(g).points).length > 0;
+const played = g => { const c = calc(g); return c.manual || c.groups.some(x => x.started) || !!(c.final && c.final.played); };
 
 function cumulative(upto) {
   const t = {}; P.forEach(p => t[p] = 0);
@@ -146,16 +148,39 @@ function standings() {
   const rows = order.map((p,i) => `<tr class="${i===0&&totals[p]>0?'lead':''}"><td class="rank">${i+1}</td><td>${esc(p)}</td>` +
     GW.map(g => played(g) ? `<td>${pts(g,p)}</td>` : `<td class="dim">–</td>`).join('') +
     `<td class="total">${totals[p]}</td></tr>`);
-  return `<h2>Total standings</h2>${table(head, rows)}${sliderHTML()}`;
+  return `<h2>Total standings</h2>${table(head, rows)}${nextHTML()}${sliderHTML()}`;
+}
+
+function nextHTML() {
+  return `<h2>Next matchups</h2><label class="pick">Show matches for <select id="nextSel">${P.map(p => `<option>${esc(p)}</option>`).join('')}</select></label><div id="nextOut"></div>`;
+}
+function renderNext() {
+  const sel = $('#nextSel'); if (!sel) return;
+  try { const k = localStorage.getItem('pd-player'); if (k && P.includes(k)) sel.value = k; } catch (e) {}
+  const draw = () => {
+    const p = sel.value, rows = [];
+    try { localStorage.setItem('pd-player', p); } catch (e) {}
+    GW.forEach((g, i) => calc(g).groups.forEach(gr => gr.matches.forEach(m => {
+      if (done(m) || (m.a !== p && m.b !== p)) return;
+      const d = g.date && g.date !== 'TBD' ? ` (${esc(g.date)})` : '';
+      rows.push(`<div class="match"><span class="dim">GW${i+1}${d}</span><span>vs <span class="w">${esc(m.a === p ? m.b : m.a)}</span></span><span class="dim">${esc(gr.name||'')}</span></div>`);
+    })));
+    $('#nextOut').innerHTML = rows.length ? `<div class="matches">${rows.join('')}</div>` : '<div class="empty">No upcoming matches scheduled for this player.</div>';
+  };
+  sel.onchange = draw; draw();
 }
 
 function gameweek(i) {
   const g = GW[i], c = calc(g);
-  if (!played(g) && !c.groups.some(x => x.started) && !c.final)
-    return `<h2>Gameweek ${i+1}</h2><div class="empty">No scores yet. Date: ${esc(g.date||'TBD')}</div>`;
   const matchHTML = m => done(m)
     ? `<div class="match"><span class="${m.sa>m.sb?'w':''}">${esc(m.a)}</span><b>${m.sa} – ${m.sb}</b><span class="${m.sb>m.sa?'w':''}">${esc(m.b)}</span></div>`
     : `<div class="match"><span>${esc(m.a)}</span><span class="dim">vs</span><span>${esc(m.b)}</span></div>`;
+  if (!played(g)) {
+    const hasFx = c.groups.some(x => x.matches.length);
+    if (!hasFx) return `<h2>Gameweek ${i+1}</h2><div class="empty">Schedule not set yet. Date: ${esc(g.date||'TBD')}</div>`;
+    return `<h2>Gameweek ${i+1}</h2><p class="sub" style="margin:-6px 0 14px">${esc(g.date||'')} · Scheduled matches, no scores yet</p>
+      <div class="groups">${c.groups.map(gr => `<section class="gcard"><h3>${esc(gr.name||'Group')}</h3><div class="gm">${gr.matches.map(matchHTML).join('')}</div></section>`).join('')}</div>`;
+  }
   const groupsHTML = c.groups.map(gr => {
     const rows = gr.rows.map((r,k) => { const top = k===0 && gr.started;
       return `<tr class="${top?'lead':''}"><td class="rank">${k+1}</td><td>${esc(r.name)}${top?` <span class="tag">${gr.done?'Winner':'Leading'}</span>`:''}</td><td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.lf}–${r.la}</td><td class="total">${r.pts}</td></tr>`; });
@@ -230,7 +255,7 @@ function show(id) {
   const t = tabs.find(t => t.id === id) || tabs[0];
   $('#view').innerHTML = t.render();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.id === t.id));
-  startSlider();
+  startSlider(); renderNext();
 }
 $('#title').innerHTML = esc(TOUR.name).replace(/(\d.*)$/, '<span>$1</span>');
 $('#sub').textContent = `${P.length} players · ${GW.length} gameweeks · playoffs`;
