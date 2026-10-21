@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PubDart 26/27</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f2a20;--panel:#153629;--line:#2a5440;--text:#f1e9d2;--mute:#9fb8a8;--red:#e0442f;--brass:#d4aa4f;--wrap:1000px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.5 "DM Sans",system-ui,sans-serif}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 20px}
+header{padding:40px 0 20px}
+h1{font:400 clamp(2.4rem,8vw,4.6rem)/1 "Alfa Slab One",Georgia,serif;margin:0;letter-spacing:.01em}
+h1 span{color:var(--red)}
+.sub{color:var(--mute);margin:10px 0 0}
+h2{font:400 1.5rem "Alfa Slab One",Georgia,serif;margin:28px 0 12px}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:8px}
+nav button{background:none;border:0;color:var(--mute);font:500 .95rem "DM Sans";padding:10px 14px;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
+nav button:hover{color:var(--text)}
+nav button[aria-selected=true]{color:var(--text);border-color:var(--red)}
+button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:10px 12px;text-align:center;white-space:nowrap}
+th{color:var(--mute);font-weight:500;font-size:.85rem;border-bottom:1px solid var(--line)}
+td:nth-child(2),th:nth-child(2){text-align:left}
+tbody tr+tr td{border-top:1px solid var(--line)}
+td.rank{color:var(--mute);width:44px}
+td.total{font-weight:700;font-size:1.1rem;color:var(--brass)}
+tr.lead td.rank{color:var(--red);font-weight:700}
+tr.lead td:nth-child(2){font-weight:700}
+.dim{color:#5f8270}
+.matches{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.match{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px}
+.match b{color:var(--brass);font-size:1.1rem}
+.match .w{font-weight:700}
+.empty{color:var(--mute);padding:18px;border:1px dashed var(--line);border-radius:6px}
+.h2h td.diag{background:#0f2a20}
+.win{color:#8fd49b}.loss{color:#f08a7c}
+.slider{position:relative;overflow:hidden;border-radius:6px;aspect-ratio:16/7;background:var(--panel);border:1px solid var(--line);margin-top:8px}
+.track{display:flex;height:100%;transition:transform .8s ease}
+.slide{flex:0 0 100%;height:100%;position:relative}
+.slide img{width:100%;height:100%;object-fit:cover;display:block}
+.slide.ph{display:grid;place-items:center;color:var(--mute);text-align:center;padding:20px}
+.dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:8px}
+.dots button{width:10px;height:10px;border-radius:50%;border:0;background:rgba(241,233,210,.4);padding:0;cursor:pointer}
+.dots button[aria-current=true]{background:var(--red)}
+.tbd{text-align:center;padding:60px 20px;border:1px dashed var(--line);border-radius:6px}
+.tbd p{color:var(--mute);max-width:46ch;margin:8px auto 0}
+footer{color:var(--mute);font-size:.85rem;padding:40px 0}
+@media (prefers-reduced-motion:reduce){.track{transition:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1 id="title"></h1>
+  <p class="sub" id="sub"></p>
+</div></header>
+<nav><div class="wrap" role="tablist" id="tabs"></div></nav>
+<main class="wrap" id="view"></main>
+<footer><div class="wrap" id="foot"></div></footer>
+
+<script src="data.js"></script>
+<script>
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const P = TOUR.players, GW = TOUR.gameweeks;
+const pts = (g, p) => Number(g.scores[p]) || 0;
+const played = g => Object.keys(g.scores).length > 0;
+
+function cumulative(upto) {
+  const t = {}; P.forEach(p => t[p] = 0);
+  GW.slice(0, upto).forEach(g => P.forEach(p => t[p] += pts(g, p)));
+  return t;
+}
+function ranked(totals) {
+  return [...P].sort((a, b) => totals[b] - totals[a] || P.indexOf(a) - P.indexOf(b));
+}
+function table(head, rows) {
+  return `<div class="tablewrap"><table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+
+function standings() {
+  const totals = cumulative(GW.length), order = ranked(totals);
+  const head = ['#','Player', ...GW.map((_,i)=>'GW'+(i+1)), 'Total'];
+  const rows = order.map((p,i) => `<tr class="${i===0&&totals[p]>0?'lead':''}"><td class="rank">${i+1}</td><td>${esc(p)}</td>` +
+    GW.map(g => played(g) ? `<td>${pts(g,p)}</td>` : `<td class="dim">–</td>`).join('') +
+    `<td class="total">${totals[p]}</td></tr>`);
+  return `<h2>Total standings</h2>${table(head, rows)}${sliderHTML()}`;
+}
+
+function gameweek(i) {
+  const g = GW[i];
+  if (!played(g) && !g.matches.length)
+    return `<h2>Gameweek ${i+1}</h2><div class="empty">No scores yet. Date: ${esc(g.date||'TBD')}</div>`;
+  const gwOrder = [...P].sort((a,b) => pts(g,b)-pts(g,a) || P.indexOf(a)-P.indexOf(b));
+  const after = cumulative(i+1);
+  const rows = gwOrder.map((p,k) => `<tr><td class="rank">${k+1}</td><td>${esc(p)}</td><td>${pts(g,p)}</td><td class="total">${after[p]}</td></tr>`);
+  const ms = g.matches.map(m => {
+    const aw = m.sa > m.sb, bw = m.sb > m.sa;
+    return `<div class="match"><span class="${aw?'w':''}">${esc(m.a)}</span><b>${m.sa} – ${m.sb}</b><span class="${bw?'w':''}">${esc(m.b)}</span></div>`;
+  }).join('');
+  return `<h2>Gameweek ${i+1}</h2><p class="sub" style="margin:-6px 0 14px">${esc(g.date||'')}</p>
+    ${table(['#','Player','GW points','Total after GW'], rows)}
+    <h2>Matches</h2>${ms ? `<div class="matches">${ms}</div>` : '<div class="empty">No matchups entered.</div>'}`;
+}
+
+function h2h() {
+  const rec = {}; P.forEach(a => { rec[a] = {}; P.forEach(b => rec[a][b] = [0,0,0]); });
+  GW.forEach(g => g.matches.forEach(m => {
+    if (!rec[m.a] || !rec[m.b]) return;
+    const r = m.sa > m.sb ? [0,1] : m.sa < m.sb ? [1,0] : null;
+    if (!r) { rec[m.a][m.b][2]++; rec[m.b][m.a][2]++; return; }
+    rec[m.a][m.b][r[0]===0?0:1]++; rec[m.b][m.a][r[0]===0?1:0]++;
+  }));
+  // rec[x][y] = [wins, losses, draws] for x against y
+  const rows = P.map(a => `<tr><td class="rank"></td><td>${esc(a)}</td>` + P.map(b => {
+    if (a===b) return '<td class="diag"></td>';
+    const [w,l,d] = rec[a][b];
+    if (!w && !l && !d) return '<td class="dim">·</td>';
+    return `<td><span class="win">${w}</span>–<span class="loss">${l}</span>${d?` <span class="dim">(${d})</span>`:''}</td>`;
+  }).join('') + '</tr>');
+  return `<h2>Head to head</h2><p class="sub" style="margin:-6px 0 14px">Row player's wins–losses against the column player. Draws in brackets.</p>
+    <div class="h2h">${table(['','Player', ...P.map(p=>esc(p))], rows)}</div>`;
+}
+
+function playoffs() {
+  const o = TOUR.playoffs;
+  return `<h2>Playoffs</h2><div class="tbd"><h2 style="margin:0">${esc(o.status)}</h2><p>${esc(o.note||'')}</p></div>`;
+}
+
+function sliderHTML() {
+  const slides = TOUR.photos.length
+    ? TOUR.photos.map(src => `<div class="slide"><img src="${esc(src)}" alt="PubDart photo" loading="lazy"></div>`).join('')
+    : `<div class="slide ph">Photos from the pub show up here.<br>Add files to /photos and list them in data.js.</div>`;
+  const n = TOUR.photos.length || 1;
+  return `<h2>Photos</h2><div class="slider" id="slider"><div class="track">${slides}</div>
+    ${n>1?`<div class="dots">${Array.from({length:n},(_,i)=>`<button aria-label="Photo ${i+1}"></button>`).join('')}</div>`:''}</div>`;
+}
+let timer;
+function startSlider() {
+  clearInterval(timer);
+  const s = $('#slider'); const n = TOUR.photos.length;
+  if (!s || n < 2) return;
+  const track = $('.track', s), dots = [...s.querySelectorAll('.dots button')];
+  let i = 0;
+  const go = k => { i = (k + n) % n; track.style.transform = `translateX(-${i*100}%)`; dots.forEach((d,j)=>d.setAttribute('aria-current', j===i)); };
+  const run = () => { clearInterval(timer); timer = setInterval(() => go(i+1), 4000); };
+  dots.forEach((d,j) => d.onclick = () => { go(j); run(); });
+  go(0); run();
+}
+
+const tabs = [
+  {id:'standings', label:'Standings', render: standings},
+  ...GW.map((_,i) => ({id:'gw'+(i+1), label:'GW'+(i+1), render: () => gameweek(i)})),
+  {id:'h2h', label:'Head to head', render: h2h},
+  {id:'playoffs', label:'Playoffs', render: playoffs},
+];
+function show(id) {
+  const t = tabs.find(t => t.id === id) || tabs[0];
+  $('#view').innerHTML = t.render();
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.id === t.id));
+  startSlider();
+}
+$('#title').innerHTML = esc(TOUR.name).replace(/(\d.*)$/, '<span>$1</span>');
+$('#sub').textContent = `${P.length} players · ${GW.length} gameweeks · playoffs`;
+$('#foot').textContent = `${TOUR.name}`;
+$('#tabs').innerHTML = tabs.map(t => `<button role="tab" data-id="${t.id}">${t.label}</button>`).join('');
+$('#tabs').onclick = e => { const b = e.target.closest('button'); if (b) { location.hash = b.dataset.id; } };
+addEventListener('hashchange', () => show(location.hash.slice(1)));
+show(location.hash.slice(1));
+</script>
+</body>
+</html>
