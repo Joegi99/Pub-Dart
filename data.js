@@ -56,7 +56,7 @@ const TOUR = {
         ]},
       
             
-        ]},
+        
       ],
       final: { a: "Group A:1", b: "Group B:1" },
     },
