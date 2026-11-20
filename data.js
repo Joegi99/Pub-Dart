@@ -39,12 +39,12 @@ const TOUR = {
      { date: "GW2",
       groups: [
         { name: "Group A", matches: [
-            { a: "Filip",   b: "Graham", sa: 0, sb: 0 },
-            { a: "Åhman", b: "Jögi", sa: 0, sb: 0},
-            { a: "Filip",   b: "Åhman", sa: 0, sb: 0},
-            { a: "Graham", b: "Jögi", sa: 0, sb: 0},
-            { a: "Filip",   b: "Jögi", sa: 0, sb: 0},
-            { a: "Graham", b: "Åhman", sa: 0, sb: 0},
+            { a: "Henkan",   b: "jögi", sa: 0, sb: 0 },
+            { a: "Jonssons", b: "Emil", sa: 0, sb: 0},
+            { a: "Håkanssons",   b: "Filip", sa: 0, sb: 0},
+            { a: "Henkan", b: "Emil", sa: 0, sb: 0},
+            { a: "Jögi",   b: "Filip", sa: 0, sb: 0},
+            { a: "Jonssons", b: "Åhman", sa: 0, sb: 0},
         ]},
         { name: "Group B", matches: [
             { a: "Emil",  b: "Henkan" , sa: 0, sb: 0},
