@@ -39,7 +39,7 @@ const TOUR = {
      { date: "GW2",
       groups: [
         { name: "Group A", matches: [
-            { a: "Filip",   b: "Graham"},
+            { a: "Filip",   b: "Graham", sa: 2, sb: 1 },
             { a: "Åhman", b: "Jögi"},
             { a: "Filip",   b: "Åhman"},
             { a: "Graham", b: "Jögi"},
