@@ -41,7 +41,7 @@ const TOUR = {
         { name: "Group A", matches: [
             { a: "Henkan",   b: "Jögi", sa: 2, sb: 0 },
             { a: "Jonssons", b: "Emil", sa: 0, sb: 2},
-            { a: "Håkanssons",   b: "Filip", sa: 0, sb: 0},
+            { a: "Håkanssons",   b: "Filip", sa: 2, sb: 0},
             { a: "Henkan", b: "Emil", sa: 2, sb: 0},
             { a: "Jögi",   b: "Filip", sa: 1, sb: 2},
             { a: "Jonssons", b: "Åhman", sa: 2, sb: 0},
