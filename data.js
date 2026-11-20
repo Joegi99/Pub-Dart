@@ -39,25 +39,25 @@ const TOUR = {
      { date: "GW2",
       groups: [
         { name: "Group A", matches: [
-            { a: "Filip",   b: "Graham", sa: 2, sb: 1 },
-            { a: "Åhman", b: "Jögi"},
-            { a: "Filip",   b: "Åhman"},
-            { a: "Graham", b: "Jögi"},
-            { a: "Filip",   b: "Jögi"},
-            { a: "Graham", b: "Åhman" },
+            { a: "Filip",   b: "Graham", sa: 0, sb: 0 },
+            { a: "Åhman", b: "Jögi", sa: 0, sb: 0},
+            { a: "Filip",   b: "Åhman", sa: 0, sb: 0},
+            { a: "Graham", b: "Jögi", sa: 0, sb: 0},
+            { a: "Filip",   b: "Jögi", sa: 0, sb: 0},
+            { a: "Graham", b: "Åhman", sa: 0, sb: 0},
         ]},
         { name: "Group B", matches: [
-            { a: "Emil",  b: "Henkan" },
-            { a: "Jonssons",  b: "Håkanssons" },
-            { a: "Martin K",  b: "Emil" },
-            { a: "Henkan", b: "Jonssons" },
-            { a: "Håkanssons",  b: "Martin K" },
-            { a: "Emil", b: "Jonssons" },
-            { a: "Henkan", b: "Håkanssons" },
+            { a: "Emil",  b: "Henkan" , sa: 0, sb: 0},
+            { a: "Jonssons",  b: "Håkanssons" , sa: 0, sb: 0},
+
+            { a: "Henkan", b: "Jonssons" , sa: 0, sb: 0},
+
+            { a: "Emil", b: "Jonssons" , sa: 0, sb: 0},
+            { a: "Henkan", b: "Håkanssons" , sa: 0, sb: 0},
             
-            { a: "Jonssons", b: "Martin K" },
-            { a: "Emil", b: "Håkanssons" },
-            { a: "Henkan", b: "Martin K" },
+
+            { a: "Emil", b: "Håkanssons" , sa: 0, sb: 0},
+            
         ]},
       ],
       final: { a: "Group A:1", b: "Group B:1" },
