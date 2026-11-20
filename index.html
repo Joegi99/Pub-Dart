@@ -66,6 +66,13 @@ tr.lead td:nth-child(2){font-weight:700}
 @media (max-width:420px){.groups{grid-template-columns:1fr}}
 .pick{color:var(--mute);display:block;margin-bottom:12px}
 .pick select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:500 1rem "DM Sans";margin-left:6px}
+.banner{background:var(--red);color:var(--text);padding:10px 14px;border-radius:6px;margin-top:16px;font-weight:500}
+.match.edit{flex-wrap:wrap;justify-content:center;gap:8px 12px}
+.sc input{width:56px;text-align:center;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:700 1.05rem "DM Sans"}
+.fs.edit{display:flex;flex-direction:column;align-items:center;gap:10px;font-size:1rem}
+.save{background:var(--brass);color:#1b1b12;border:0;border-radius:6px;padding:7px 14px;font:700 .9rem "DM Sans";cursor:pointer}
+.save:disabled{opacity:.6}
+.lnk{background:none;border:0;color:var(--mute);text-decoration:underline;font:inherit;cursor:pointer;padding:0}
 footer{color:var(--mute);font-size:.85rem;padding:40px 0}
 @media (prefers-reduced-motion:reduce){.track{transition:none}}
 </style>
@@ -138,6 +145,30 @@ function cumulative(upto) {
 function ranked(totals) {
   return [...P].sort((a, b) => totals[b] - totals[a] || P.indexOf(a) - P.indexOf(b));
 }
+// ---- live scores (saved on the server, merged over data.js) ----
+let EDIT = false, PW = '', REMOTE = {}, curTab = 'standings';
+const mkey = (i, a, b) => i + ':' + a + '|' + b;
+GW.forEach(g => { (g.groups||[]).forEach(gr => gr.matches.forEach(m => m._b = [m.sa, m.sb])); g.final = g.final || {}; g.final._b = [g.final.sa, g.final.sb]; });
+function applyRemote() {
+  const set = (m, r) => { const v = r || m._b; m.sa = v[0]; m.sb = v[1]; };
+  GW.forEach((g, i) => { (g.groups||[]).forEach(gr => gr.matches.forEach(m => set(m, REMOTE[mkey(i, m.a, m.b)]))); set(g.final, REMOTE[i + ':final']); delete g._c; });
+}
+async function loadRemote() {
+  try {
+    const r = await fetch('/api/scores', {cache:'no-store'}); if (!r.ok) return false;
+    const sc = (await r.json()).scores || {};
+    if (JSON.stringify(sc) === JSON.stringify(REMOTE)) return false;
+    REMOTE = sc; applyRemote(); return true;
+  } catch (e) { return false; }
+}
+async function post(body) {
+  const r = await fetch('/api/scores', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: PW, ...body})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Could not save');
+}
+const inputs = (a, b) => `<span class="sc"><input type="number" min="0" max="99" inputmode="numeric" value="${a==null?'':a}" aria-label="Score left"> – <input type="number" min="0" max="99" inputmode="numeric" value="${b==null?'':b}" aria-label="Score right"></span>`;
+const editRow = (key, a, b, sa, sb) => `<div class="match edit" data-key="${esc(key)}"><span>${esc(a)}</span>${inputs(sa, sb)}<span>${esc(b)}</span><button class="save">Save</button></div>`;
+
 function table(head, rows) {
   return `<div class="tablewrap"><table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
 }
@@ -172,7 +203,7 @@ function renderNext() {
 
 function gameweek(i) {
   const g = GW[i], c = calc(g);
-  const matchHTML = m => done(m)
+  const matchHTML = m => EDIT ? editRow(mkey(i, m.a, m.b), m.a, m.b, m.sa, m.sb) : done(m)
     ? `<div class="match"><span class="${m.sa>m.sb?'w':''}">${esc(m.a)}</span><b>${m.sa} – ${m.sb}</b><span class="${m.sb>m.sa?'w':''}">${esc(m.b)}</span></div>`
     : `<div class="match"><span>${esc(m.a)}</span><span class="dim">vs</span><span>${esc(m.b)}</span></div>`;
   if (!played(g)) {
@@ -190,7 +221,7 @@ function gameweek(i) {
   let finalHTML = '';
   if (c.final) { const f = c.final;
     finalHTML = `<h2>Final</h2><div class="final"><div class="fp ${f.played&&f.sa>f.sb?'w':''}">${esc(f.a)}</div>
-      <div class="fs">${f.played ? `${f.sa} – ${f.sb}` : 'vs'}</div><div class="fp ${f.played&&f.sb>f.sa?'w':''}">${esc(f.b)}</div>
+      ${EDIT ? `<div class="fs edit" data-key="${i}:final">${inputs(f.sa, f.sb)}<button class="save">Save</button></div>` : `<div class="fs">${f.played ? `${f.sa} – ${f.sb}` : 'vs'}</div>`}<div class="fp ${f.played&&f.sb>f.sa?'w':''}">${esc(f.b)}</div>
       <div class="bonus">${f.played && f.sa!==f.sb ? `+${CFG.finalBonus} point to ${esc(f.sa>f.sb?f.a:f.b)}` : `Winner gets +${CFG.finalBonus} point`}</div></div>`; }
   const order = [...P].sort((a,b) => pts(g,b)-pts(g,a) || P.indexOf(a)-P.indexOf(b));
   const after = cumulative(i+1);
@@ -253,17 +284,42 @@ const tabs = [
 ];
 function show(id) {
   const t = tabs.find(t => t.id === id) || tabs[0];
-  $('#view').innerHTML = t.render();
+  curTab = t.id;
+  $('#view').innerHTML = (EDIT ? '<div class="banner">Edit mode on. Type the scores and press Save on each match. Saved scores are shown to everyone.</div>' : '') + t.render();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.id === t.id));
   startSlider(); renderNext();
 }
 $('#title').innerHTML = esc(TOUR.name).replace(/(\d.*)$/, '<span>$1</span>');
 $('#sub').textContent = `${P.length} players · ${GW.length} gameweeks · playoffs`;
-$('#foot').textContent = `${TOUR.name}`;
+$('#foot').innerHTML = `${esc(TOUR.name)} · <button class="lnk" id="editBtn">Edit scores</button>`;
+function setEdit(on) { EDIT = on; $('#editBtn').textContent = on ? 'Exit edit mode' : 'Edit scores'; show(curTab); }
+$('#editBtn').onclick = async () => {
+  if (EDIT) { setEdit(false); return; }
+  PW = '';
+  try { await post({}); setEdit(true); return; } catch (e) { if (e.message !== 'Wrong password') return alert(e.message); }
+  const pw = prompt('Password to edit scores:'); if (!pw) return;
+  PW = pw;
+  try { await post({}); try { sessionStorage.setItem('pd-pw', pw); } catch (e) {} setEdit(true); } catch (e) { alert(e.message); }
+};
+$('#view').addEventListener('click', async e => {
+  const btn = e.target.closest('.save'); if (!btn) return;
+  const row = btn.closest('[data-key]'), [x, y] = row.querySelectorAll('input');
+  const clear = x.value === '' && y.value === '';
+  if (!clear && (x.value === '' || y.value === '')) return alert('Fill in both scores (or leave both empty to clear).');
+  if (!clear && Number(x.value) === Number(y.value)) return alert('A match cannot end in a tie.');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await post({key: row.dataset.key, sa: clear ? null : Number(x.value), sb: clear ? null : Number(y.value)});
+    await loadRemote(); const sy = scrollY; show(curTab); scrollTo(0, sy);
+  } catch (err) { alert(err.message); btn.disabled = false; btn.textContent = 'Save'; }
+});
+setInterval(async () => { if (!EDIT && !document.hidden && await loadRemote()) show(curTab); }, 30000);
+try { const k = sessionStorage.getItem('pd-pw'); if (k) { PW = k; post({}).then(() => setEdit(true)).catch(() => {}); } } catch (e) {}
 $('#tabs').innerHTML = tabs.map(t => `<button role="tab" data-id="${t.id}">${t.label}</button>`).join('');
 $('#tabs').onclick = e => { const b = e.target.closest('button'); if (b) { location.hash = b.dataset.id; } };
 addEventListener('hashchange', () => show(location.hash.slice(1)));
 show(location.hash.slice(1));
+loadRemote().then(ch => ch && show(curTab));
 </script>
 </body>
 </html>
