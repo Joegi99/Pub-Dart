@@ -50,9 +50,9 @@ const TOUR = {
             { a: "Åhman", b: "Emil", sa: 0, sb: 2},
             { a: "Henkan",   b: "Filip", sa: 2, sb: 0},
             
-            { a: "Henkan", b: "Åhman", sa: 2, sb: 0},
-            { a: "Jögi",   b: "Filip", sa: 1, sb: 2},
-            { a: "Jonssons", b: "Åhman", sa: 2, sb: 0},
+            { a: "Håkanssons", b: "Åhman", sa: 2, sb: 0},
+            { a: "Jögi",   b: "Emil", sa: 1, sb: 2},
+            { a: "Jonssons", b: "Henkan", sa: 2, sb: 0},
         ]},
       
             
